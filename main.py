@@ -90,6 +90,15 @@ def get_text_messages(message):
                     is_yes_to_start[user_id] = 0
                     bot.send_message(message.from_user.id,
                                      config.success_message)
+                    specification = ''
+                    if levels[user_id][1] == 2:
+                        specification = "DataScience"
+                    elif levels[user_id][1] == 4:
+                        specification = "FrontEnd"
+                    username = message.from_user.username
+                    first_name = message.from_user.first_name
+                    pr1 = str(user_id) + "|" + str(username) + " - " + str(first_name) + "|" + str(specification) + "|" + "passed"
+                    requests.get("https://hr-hackaton.herokuapp.com/hr/addUser?pr1={}".format(pr1))
                     levels.pop(user_id)
                     used.pop(user_id)
                 else:
@@ -99,11 +108,19 @@ def get_text_messages(message):
                     levels[user_id][1] += 1
             else:
                 bot.send_message(message.from_user.id, config.failed_message)
+                specification = ''
                 if levels[user_id][1] == 1:
                     bot.send_message(message.from_user.id, "Чтобы не терять время напрасно предлагаем вам курсы от нашего партнера\n\n" + config.datascience_ad)
+                    specification = "DataScience"
                 elif levels[user_id][1] == 3:
                     bot.send_message(message.from_user.id,
-                                     "Для улучшения навыков предлагаем вам курсы от нашего партнера\n\n" + config.frontend_ad)
+                                     "Чтобы не терять время напрасно предлагаем вам курсы от нашего партнера\n\n" + config.frontend_ad)
+                    specification = "FrontEnd"
+
+                username = message.from_user.username
+                first_name = message.from_user.first_name
+                pr1 = str(user_id) + "|" + str(username) + " - " + str(first_name) + "|" + str(specification) + "|" + "failed"
+                requests.get("https://hr-hackaton.herokuapp.com/hr/addUser?pr1={}".format(pr1))
                 is_yes_to_start[user_id] = 0
             if user_id in levels and user_id in used:
                 levels[user_id][3] = []
@@ -120,6 +137,8 @@ def get_text_messages(message):
                 else:
                     levels[user_id][0] += 1
             if levels[user_id][1] == 0:
+                if levels[user_id][4] == 2 and message.text.lower() == "нет":
+                    rand1 = 3
                 levels[user_id][4] = rand1 + 1
                 if (levels[user_id][4] > len(questions[level])):
                     if (message.text == 'DATA SCIENTIST'):
@@ -148,8 +167,6 @@ def get_text_messages(message):
     if s1 != '.' and is_yes_to_start[user_id] != 0:
         msg = bot.send_message(message.from_user.id, s1, reply_markup=markup)
         print("Бот написал: ", '"', s1, '"', sep='')
-        #if questions[level][rand1][1] == "fio":
-            #bot.register_next_step_handler(msg, fio)
     sys.stdout = open(filename, 'a')
 
 @bot.message_handler(content_types=['voice'])
@@ -179,7 +196,7 @@ def get_voice_messages(message):
         bot.send_message(message.from_user.id, 'Ваше голосовое сообщение было распознано как: \n\n' + text_from_voice + "\n\nСообщение было сохранено для дальнейшего прочтения и прослушивания\nДля продолжения напишите /continue. Если голосовая не устроила, то запишите еще раз")
         print("Пользователь сказал(голосовая #{}): ".format(file_info.file_path[11:-4]), text_from_voice)
     else:
-        bot.send_message(message.from_user.id, "Сообщение не было распознано, но сохранено для дальшейшего прослушивания")
+        bot.send_message(message.from_user.id, "Сообщение не было распознано, но сохранено для дальнейшего прослушивания")
         print("Бот не смог распознать речь или она отсутствовала(голосовая #{})".format(file_info.file_path[11:-4]))
     sys.stdout = open(filename, 'a')
 
