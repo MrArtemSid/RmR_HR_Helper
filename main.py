@@ -7,17 +7,16 @@ from telebot import types
 from random import randint
 
 # Cвои библиотеки
-from config import token
 import config
 import convert
 from questions import questions
 used = {}
 levels = {}
+names = {}
 
-bot = telebot.TeleBot(token)
+bot = telebot.TeleBot(config.token)
 print("Бот работает")
 is_yes_to_start = dict()
-
 @bot.message_handler(commands=['start'])
 # Спрашиваем человека готов ли он к собеседованию
 def st(message):
@@ -54,7 +53,7 @@ def get_text_messages(message):
     sys.stdout = open(filename, 'a')
 
     s1 = '.'
-    flag_for_keys = 0
+    markup = types.ReplyKeyboardRemove(selective=False)
     if user_id not in is_yes_to_start:
         is_yes_to_start[user_id] = 0
     if is_yes_to_start[user_id] == 0:
@@ -63,7 +62,8 @@ def get_text_messages(message):
         elif message.text.lower() == "да":
             s1 = "Хорошо, начнём"
             is_yes_to_start[user_id] = 1
-        bot.send_message(message.from_user.id,
+        if s1 != '.':
+            bot.send_message(message.from_user.id,
                          s1)
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
@@ -75,7 +75,7 @@ def get_text_messages(message):
                 levels[user_id][3].append(message.text)
         level = levels[user_id][1]
         if levels[user_id][0] >= config.cnt_questions:
-            levels[user_id][0] = 1
+            levels[user_id][0] = 0
             cnt_correct = 0
             for i in range(len(used[user_id])):
                 curr_block = questions[levels[user_id][1]] # узнаем блок
@@ -89,17 +89,29 @@ def get_text_messages(message):
                 if levels[user_id][1] in [2, 4]:
                     is_yes_to_start[user_id] = 0
                     bot.send_message(message.from_user.id,
-                                     "Мы переходим к финальному этапу нашего собеседования")
+                                     config.success_message)
+                    levels.pop(user_id)
+                    used.pop(user_id)
                 else:
                     bot.send_message(message.from_user.id,
                                      "Я удивлен вашим познаниям. Давайте узнаем на что вы действительно способны")
-                levels[user_id][1] += 1
+                if user_id in levels:
+                    levels[user_id][1] += 1
             else:
-                bot.send_message(message.from_user.id, "Спасибо за проходение тестирования ! Мы вам перезвоним.")
+                bot.send_message(message.from_user.id, config.failed_message)
+                if levels[user_id][1] == 1:
+                    bot.send_message(message.from_user.id, "Чтобы не терять время напрасно предлагаем вам курсы от нашего партнера\n\n" + config.datascience_ad)
+                elif levels[user_id][1] == 3:
+                    bot.send_message(message.from_user.id,
+                                     "Для улучшения навыков предлагаем вам курсы от нашего партнера\n\n" + config.frontend_ad)
                 is_yes_to_start[user_id] = 0
-            levels[user_id][3] = []
-            used[user_id] = []
-        level = levels[user_id][1]
+                levels.pop(user_id)
+                used.pop(user_id)
+            if user_id in levels and user_id in used:
+                levels[user_id][3] = []
+                used[user_id] = []
+        if user_id in levels:
+            level = levels[user_id][1]
         if len(questions[level]) > 0 and is_yes_to_start[user_id] != 0:
             if levels[user_id][1] == 0:
                 rand1 = levels[user_id][4]
@@ -133,19 +145,14 @@ def get_text_messages(message):
                     if tmp[0] == '!':
                         tmp = tmp[1:]
                     markup.add(types.KeyboardButton(tmp))
-                bot.send_message(message.chat.id, s1, reply_markup=markup)
-                print("Бот написал: ", '"', s1, '"', sep='')
-                flag_for_keys = 1
-
-
-    if s1 != '.' and not flag_for_keys and is_yes_to_start[user_id] != 0:
-        flag_for_keys = 0
-        bot.send_message(message.from_user.id, s1)
-        print("Бот написал: ", '"', s1, '"', sep='')
 
     print("Пользователь написал: ", '"', message.text, '"', sep='')
+    if s1 != '.' and is_yes_to_start[user_id] != 0:
+        msg = bot.send_message(message.from_user.id, s1, reply_markup=markup)
+        print("Бот написал: ", '"', s1, '"', sep='')
+        #if questions[level][rand1][1] == "fio":
+            #bot.register_next_step_handler(msg, fio)
     sys.stdout = open(filename, 'a')
-
 
 @bot.message_handler(content_types=['voice'])
 def get_voice_messages(message):
@@ -155,7 +162,7 @@ def get_voice_messages(message):
         mkdir(folder_name)
     file_info = bot.get_file(message.voice.file_id)
     filename = folder_name + '/' + file_info.file_path[6:]
-    file = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(token, file_info.file_path))
+    file = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(config.token, file_info.file_path))
 
     with open(filename, 'wb') as f:
         f.write(file.content)
@@ -171,10 +178,10 @@ def get_voice_messages(message):
     filename = folder_name + '/' + 'user_input.txt'
     sys.stdout = open(filename, 'a')
     if len(text_from_voice) > 0:
-        bot.send_message(message.from_user.id, 'Ваше голосовое сообщение было распознано как: \n\n' + text_from_voice)
+        bot.send_message(message.from_user.id, 'Ваше голосовое сообщение было распознано как: \n\n' + text_from_voice + "\n\nСообщение было сохранено для дальнейшего прочтения и прослушивания\nДля продолжения напишите /continue. Если голосовая не устроила, то запишите еще раз")
         print("Пользователь сказал(голосовая #{}): ".format(file_info.file_path[11:-4]), text_from_voice)
     else:
-        bot.send_message(message.from_user.id, "не понимаю, не услышал вас")
+        bot.send_message(message.from_user.id, "Сообщение не было распознано, но сохранено для дальшейшего прослушивания")
         print("Бот не смог распознать речь или она отсутствовала(голосовая #{})".format(file_info.file_path[11:-4]))
     sys.stdout = open(filename, 'a')
 
