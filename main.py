@@ -105,8 +105,6 @@ def get_text_messages(message):
                     bot.send_message(message.from_user.id,
                                      "Для улучшения навыков предлагаем вам курсы от нашего партнера\n\n" + config.frontend_ad)
                 is_yes_to_start[user_id] = 0
-                levels.pop(user_id)
-                used.pop(user_id)
             if user_id in levels and user_id in used:
                 levels[user_id][3] = []
                 used[user_id] = []
