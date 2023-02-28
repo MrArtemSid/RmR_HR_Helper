@@ -8,7 +8,6 @@ from random import randint
 
 # Cвои библиотеки
 import config
-import convert
 from questions import questions
 used = {}
 levels = {}
@@ -22,7 +21,7 @@ is_yes_to_start = dict()
 def st(message):
     user_id = str(message.from_user.id)
     is_yes_to_start[user_id] = 0
-    levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+    levels[user_id] = [0, 1, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
     used[user_id] = []
 
     folder_name = user_id
@@ -67,7 +66,7 @@ def get_text_messages(message):
                          s1)
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
-            levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+            levels[user_id] = [0, 1, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
         if user_id not in used:
             used[user_id] = []
         else:
@@ -167,37 +166,6 @@ def get_text_messages(message):
     if s1 != '.' and is_yes_to_start[user_id] != 0:
         msg = bot.send_message(message.from_user.id, s1, reply_markup=markup)
         print("Бот написал: ", '"', s1, '"', sep='')
-    sys.stdout = open(filename, 'a')
-
-@bot.message_handler(content_types=['voice'])
-def get_voice_messages(message):
-    user_id = str(message.from_user.id)
-    folder_name = user_id
-    if not path.exists(folder_name):
-        mkdir(folder_name)
-    file_info = bot.get_file(message.voice.file_id)
-    filename = folder_name + '/' + file_info.file_path[6:]
-    file = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(config.token, file_info.file_path))
-
-    with open(filename, 'wb') as f:
-        f.write(file.content)
-
-    src_filename = filename
-    dest_filename = filename[:-4] + ".wav"
-    convert.oga_to_wav(src_filename, dest_filename)
-    remove(src_filename)
-    if (stat(dest_filename).st_size) < 1024 * 1024:  # Яндекс не распознает аудиофайлы больше 1 МБ.
-        text_from_voice = convert.voice_to_text_yandex(dest_filename)
-    else:
-        text_from_voice = convert.voice_to_text_google(dest_filename)
-    filename = folder_name + '/' + 'user_input.txt'
-    sys.stdout = open(filename, 'a')
-    if len(text_from_voice) > 0:
-        bot.send_message(message.from_user.id, 'Ваше голосовое сообщение было распознано как: \n\n' + text_from_voice + "\n\nСообщение было сохранено для дальнейшего прочтения и прослушивания\nДля продолжения напишите /continue. Если голосовая не устроила, то запишите еще раз")
-        print("Пользователь сказал(голосовая #{}): ".format(file_info.file_path[11:-4]), text_from_voice)
-    else:
-        bot.send_message(message.from_user.id, "Сообщение не было распознано, но сохранено для дальнейшего прослушивания")
-        print("Бот не смог распознать речь или она отсутствовала(голосовая #{})".format(file_info.file_path[11:-4]))
     sys.stdout = open(filename, 'a')
 
 
