@@ -9,6 +9,7 @@ from random import randint
 # Cвои библиотеки
 import config
 from questions import questions
+
 used = {}
 levels = {}
 names = {}
@@ -16,12 +17,32 @@ names = {}
 bot = telebot.TeleBot(config.token)
 print("Бот работает")
 is_yes_to_start = dict()
+
+
+class UserInfo:
+    def __init__(self, num_of_ans, level, type_of_q, arr_of_ans, q_id, status):
+        self.num_of_ans = num_of_ans
+        self.level = level
+        self.type_of_q = type_of_q
+        self.arr_of_ans = arr_of_ans
+        self.q_id = q_id
+        self.status = status
+
+    num_of_ans = 0  # количество ответов
+    level = 0  # уровень блока вопросов
+    type_of_q = "type"  # тип вопроса
+    arr_of_ans = []  # ответы пользователя
+    q_id = 0  # номер текущего вопроса
+    status = "passed"
+
+
 @bot.message_handler(commands=['start'])
 # Спрашиваем человека готов ли он к собеседованию
 def st(message):
     user_id = str(message.from_user.id)
     is_yes_to_start[user_id] = 0
-    levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+    levels[user_id] = UserInfo(0, 0, 'type', [], 0,
+                               'passed')
     used[user_id] = []
 
     folder_name = user_id
@@ -41,6 +62,7 @@ def st(message):
     print("Бот написал: ", '"', s1, '"', sep='')
 
     sys.stdout = open(filename, 'a')
+
 
 @bot.message_handler(content_types=['text'])
 def get_text_messages(message):
@@ -63,31 +85,32 @@ def get_text_messages(message):
             is_yes_to_start[user_id] = 1
         if s1 != '.':
             bot.send_message(message.from_user.id,
-                         s1)
+                             s1)
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
-            levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+            levels[user_id] = UserInfo(0, 0, 'type', [], 0,
+                                       'passed')  # количество ответов, уровень блока вопросов, тип вопроса, ответы
         if user_id not in used:
             used[user_id] = []
         else:
-            if levels[user_id][2] == "keys":
-                levels[user_id][3].append(message.text)
-        level = levels[user_id][1]
-        if levels[user_id][0] >= config.cnt_questions:
-            levels[user_id][0] = 0
+            if levels[user_id].type_of_q == "keys":
+                levels[user_id].arr_of_ans.append(message.text)
+        level = levels[user_id].level
+        if levels[user_id].num_of_ans >= config.cnt_questions:
+            levels[user_id].num_of_ans = 0
             cnt_correct = 0
             for i in range(len(used[user_id])):
-                curr_block = questions[levels[user_id][1]] # узнаем блок
-                for corr_ans in curr_block[used[user_id][i]]: # ответы нужного вопроса
+                curr_block = questions[levels[user_id].level]  # узнаем блок
+                for corr_ans in curr_block[used[user_id][i]]:  # ответы нужного вопроса
                     if corr_ans[0] == "!":
                         corr_ans = corr_ans[1:]
                         break
-                if corr_ans == levels[user_id][3][i]:
+                if corr_ans == levels[user_id].arr_of_ans[i]:
                     cnt_correct += 1
             if cnt_correct >= config.correct_ans:
-                if levels[user_id][1] in [1, 4]:
+                if levels[user_id].level in [1, 4]:
                     is_yes_to_start[user_id] = 0
-                    text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) + "% правильно"
+                    text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) + "% вопросов"
                     bot.send_message(message.from_user.id,
                                      text)
                     levels.pop(user_id)
@@ -96,43 +119,43 @@ def get_text_messages(message):
                     bot.send_message(message.from_user.id,
                                      "Я удивлен вашим познаниям. Давайте узнаем на что вы действительно способны")
                 if user_id in levels:
-                    levels[user_id][1] += 1
+                    levels[user_id].level += 1
             else:
                 text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions) \
-                          + "% правильно\n Вам следует серьезнее подготовиться, иначе можно завалить КТ"
+                       + "% вопросов\n Вам следует серьезнее подготовиться, иначе можно завалить КТ"
                 bot.send_message(message.from_user.id, text)
                 is_yes_to_start[user_id] = 0
             if user_id in levels and user_id in used:
-                levels[user_id][3] = []
+                levels[user_id].arr_of_ans = []
                 used[user_id] = []
         if user_id in levels:
-            level = levels[user_id][1]
+            level = levels[user_id].level
         if len(questions[level]) > 0 and is_yes_to_start[user_id] != 0:
-            if levels[user_id][1] == 0:
-                rand1 = levels[user_id][4]
-            if levels[user_id][1] != 0:
+            if levels[user_id].level == 0:
+                rand1 = levels[user_id].q_id
+            if levels[user_id].level != 0:
                 rand1 = randint(0, len(questions[level]) - 1)
                 while rand1 in used[user_id]:
                     rand1 = randint(0, len(questions[level]) - 1)
                 else:
-                    levels[user_id][0] += 1
-            if levels[user_id][1] == 0:
-                if levels[user_id][4] == 2 and message.text.lower() == "нет":
+                    levels[user_id].num_of_ans += 1
+            if levels[user_id].level == 0:
+                if levels[user_id].q_id == 2 and message.text.lower() == "нет":
                     rand1 = 3
-                levels[user_id][4] = rand1 + 1
-                if (levels[user_id][4] > len(questions[level])):
-                    #if (message.text == '8'):
+                levels[user_id].q_id = rand1 + 1
+                if (levels[user_id].q_id > len(questions[level])):
+                    # if (message.text == '8'):
                     level = 1
-                    levels[user_id][1] = level
-                    levels[user_id][0] = 1
-                    levels[user_id][3] = []
+                    levels[user_id].level = level
+                    levels[user_id].num_of_ans = 1
+                    levels[user_id].arr_of_ans = []
                     used[user_id] = []
                     rand1 = randint(0, len(questions[level]) - 1)
 
             used[user_id].append(rand1)
             s1 = questions[level][rand1][0]
             type_q = questions[level][rand1][1]
-            levels[user_id][2] = type_q
+            levels[user_id].type_of_q = type_q
             if type_q == "keys":
                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
                 for i in range(len(questions[level][rand1][2:])):
