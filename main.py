@@ -21,7 +21,7 @@ is_yes_to_start = dict()
 def st(message):
     user_id = str(message.from_user.id)
     is_yes_to_start[user_id] = 0
-    levels[user_id] = [0, 1, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+    levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
     used[user_id] = []
 
     folder_name = user_id
@@ -66,7 +66,7 @@ def get_text_messages(message):
                          s1)
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
-            levels[user_id] = [0, 1, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
+            levels[user_id] = [0, 0, 'type', [], 0, 'passed'] # количество ответов, уровень блока вопросов, тип вопроса, ответы
         if user_id not in used:
             used[user_id] = []
         else:
@@ -85,19 +85,11 @@ def get_text_messages(message):
                 if corr_ans == levels[user_id][3][i]:
                     cnt_correct += 1
             if cnt_correct >= config.correct_ans:
-                if levels[user_id][1] in [2, 4]:
+                if levels[user_id][1] in [1, 4]:
                     is_yes_to_start[user_id] = 0
+                    text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) + "% правильно"
                     bot.send_message(message.from_user.id,
-                                     config.success_message)
-                    specification = ''
-                    if levels[user_id][1] == 2:
-                        specification = "DataScience"
-                    elif levels[user_id][1] == 4:
-                        specification = "FrontEnd"
-                    username = message.from_user.username
-                    first_name = message.from_user.first_name
-                    pr1 = str(user_id) + "|" + str(username) + " - " + str(first_name) + "|" + str(specification) + "|" + "passed"
-                    requests.get("https://hr-hackaton.herokuapp.com/hr/addUser?pr1={}".format(pr1))
+                                     text)
                     levels.pop(user_id)
                     used.pop(user_id)
                 else:
@@ -106,20 +98,9 @@ def get_text_messages(message):
                 if user_id in levels:
                     levels[user_id][1] += 1
             else:
-                bot.send_message(message.from_user.id, config.failed_message)
-                specification = ''
-                if levels[user_id][1] == 1:
-                    bot.send_message(message.from_user.id, "Чтобы не терять время напрасно предлагаем вам курсы от нашего партнера\n\n" + config.datascience_ad)
-                    specification = "DataScience"
-                elif levels[user_id][1] == 3:
-                    bot.send_message(message.from_user.id,
-                                     "Чтобы не терять время напрасно предлагаем вам курсы от нашего партнера\n\n" + config.frontend_ad)
-                    specification = "FrontEnd"
-
-                username = message.from_user.username
-                first_name = message.from_user.first_name
-                pr1 = str(user_id) + "|" + str(username) + " - " + str(first_name) + "|" + str(specification) + "|" + "failed"
-                requests.get("https://hr-hackaton.herokuapp.com/hr/addUser?pr1={}".format(pr1))
+                text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions) \
+                          + "% правильно\n Вам следует серьезнее подготовиться, иначе можно завалить КТ"
+                bot.send_message(message.from_user.id, text)
                 is_yes_to_start[user_id] = 0
             if user_id in levels and user_id in used:
                 levels[user_id][3] = []
@@ -140,10 +121,8 @@ def get_text_messages(message):
                     rand1 = 3
                 levels[user_id][4] = rand1 + 1
                 if (levels[user_id][4] > len(questions[level])):
-                    if (message.text == 'DATA SCIENTIST'):
-                        level = 1
-                    else:
-                        level = 3
+                    #if (message.text == '8'):
+                    level = 1
                     levels[user_id][1] = level
                     levels[user_id][0] = 1
                     levels[user_id][3] = []
