@@ -20,20 +20,22 @@ is_yes_to_start = dict()
 
 
 class UserInfo:
-    def __init__(self, num_of_ans, level, type_of_q, prev_ans, q_id, cnt_correct):
+    def __init__(self, num_of_ans, level, type_of_q, prev_ans_ind, q_id, cnt_correct, corr_ans_ind):
         self.num_of_ans = num_of_ans
         self.level = level
         self.type_of_q = type_of_q
-        self.prev_ans = prev_ans
         self.q_id = q_id
+        self.prev_ans_ind = prev_ans_ind
         self.cnt_correct = cnt_correct
+        self.corr_ans_ind = corr_ans_ind
 
     num_of_ans = 0  # количество ответов
     level = 0  # уровень блока вопросов
     type_of_q = "type"  # тип вопроса
-    prev_ans = ""  # предыдущий ответ пользователя
+    prev_ans_ind = -1  # индекс предыдущего ответа пользователя
     q_id = 0  # номер текущего вопроса
     cnt_correct = 0 # количество верных ответов
+    corr_ans_ind = -1 # индекс предыдущего правильного ответа
 
 def get_result(message, user_id):
     if levels[user_id].num_of_ans >= config.cnt_questions:
@@ -58,24 +60,26 @@ def get_result(message, user_id):
             bot.send_message(message.from_user.id, text)
             is_yes_to_start[user_id] = 0
         if user_id in levels and user_id in used:
-            levels[user_id].prev_ans = ""
+            levels[user_id].prev_ans_ind = -1
+            levels[user_id].corr_ans_ind = -1
             used[user_id] = []
 
 def get_prev_correct_answer(user_id, level):
     prev_corr_ans = ""
-    if levels[user_id].prev_ans != "":
-        tmp = "!" + levels[user_id].prev_ans
-        for ans in questions[level][used[user_id][-1]][2:]:
-            if ans[0] == "!":
-                prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + ans[1:]
-            if tmp == ans:
-                prev_corr_ans = ""
-                levels[user_id].cnt_correct += 1
-                break
+    if levels[user_id].prev_ans_ind != -1:
+        ans_id = levels[user_id].prev_ans_ind
+        correct_ans_id = levels[user_id].corr_ans_ind
+        if questions[level][used[user_id][-1]][2:][ans_id][0] != "!":
+            prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + questions[level][used[user_id][-1]][2:][correct_ans_id][1:]
+        else:
+            levels[user_id].cnt_correct += 1
     return prev_corr_ans
 
 def init_new_task(user_id, level, rand1, markup):
-    used[user_id].append(rand1)
+    if (rand1 == -1):
+        rand1 = used[user_id][-1]
+    else:
+        used[user_id].append(rand1)
     s1 = questions[level][rand1][0]
     type_q = questions[level][rand1][1]
     levels[user_id].type_of_q = type_q
@@ -94,8 +98,8 @@ def init_new_task(user_id, level, rand1, markup):
 def st(message):
     user_id = str(message.from_user.id)
     is_yes_to_start[user_id] = 0
-    levels[user_id] = UserInfo(0, 0, 'type', "", 0,
-                               0)
+    levels[user_id] = UserInfo(0, 0, 'type', -1, 0,
+                               0, -1)
     used[user_id] = []
 
     folder_name = user_id
@@ -141,13 +145,28 @@ def get_text_messages(message):
                              s1)
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
-            levels[user_id] = UserInfo(0, 0, 'type', "", 0,
-                                       0)  # количество ответов, уровень блока вопросов, тип вопроса, количество верных ответов
+            levels[user_id] = UserInfo(0, 0, 'type', -1, 0,
+                                       0, -1)  # количество ответов, уровень блока вопросов, тип вопроса, количество верных ответов
         if user_id not in used:
             used[user_id] = []
         else:
             if levels[user_id].type_of_q == "keys":
-                levels[user_id].prev_ans = message.text
+                level = levels[user_id].level
+                i = 0
+                is_fine = 0
+                for ans in questions[level][used[user_id][-1]][2:]:
+                    if ans in [message.text, "!" + message.text]:
+                        levels[user_id].prev_ans_ind = i
+                        is_fine = 1
+                    if ans[0] == "!":
+                        levels[user_id].corr_ans_ind = i
+                    i += 1
+                if not (is_fine):
+                    s1, markup = init_new_task(user_id, level, -1, markup)
+                    bot.send_message(message.from_user.id, s1, reply_markup=markup)
+                    return
+
+
         level = levels[user_id].level
         get_result(message, user_id)
         if user_id in levels:
@@ -168,7 +187,8 @@ def get_text_messages(message):
                     level = 1
                     levels[user_id].level = level
                     levels[user_id].num_of_ans = 1
-                    levels[user_id].prev_ans = ""
+                    levels[user_id].prev_ans_ind = -1
+                    levels[user_id].corr_ans_ind = -1
                     used[user_id] = []
                     rand1 = randint(0, len(questions[level]) - 1)
 
