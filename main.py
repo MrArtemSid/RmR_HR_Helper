@@ -35,6 +35,59 @@ class UserInfo:
     q_id = 0  # номер текущего вопроса
     cnt_correct = 0 # количество верных ответов
 
+def get_result(message, user_id):
+    if levels[user_id].num_of_ans >= config.cnt_questions:
+        levels[user_id].num_of_ans = 0
+        if levels[user_id].cnt_correct >= config.correct_ans:
+            if levels[user_id].level in [2, 4]:
+                is_yes_to_start[user_id] = 0
+                text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / (
+                            config.cnt_questions * 2) * 100) + "% вопросов\nНажмите /start для повторной попытки"
+                bot.send_message(message.from_user.id,
+                                 text)
+                levels.pop(user_id)
+                used.pop(user_id)
+            else:
+                bot.send_message(message.from_user.id,
+                                 "Я удивлен вашим познаниям. Давайте узнаем на что вы действительно способны")
+            if user_id in levels:
+                levels[user_id].level += 1
+        else:
+            text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / config.cnt_questions * 100) \
+                   + "% вопросов первого теста\n Вам следует серьезнее подготовиться, иначе можно завалить КТ\nНажмите /start для повторной попытки"
+            bot.send_message(message.from_user.id, text)
+            is_yes_to_start[user_id] = 0
+        if user_id in levels and user_id in used:
+            levels[user_id].arr_of_ans = []
+            used[user_id] = []
+
+def get_prev_correct_answer(user_id, level):
+    prev_corr_ans = ""
+    if (len(levels[user_id].arr_of_ans) > 0):
+        tmp = "!" + levels[user_id].arr_of_ans[-1]
+        for ans in questions[level][used[user_id][-1]][2:]:
+            if ans[0] == "!":
+                prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + ans[1:]
+            if tmp == ans:
+                prev_corr_ans = ""
+                levels[user_id].cnt_correct += 1
+                break
+    return prev_corr_ans
+
+def init_new_task(user_id, level, rand1, markup):
+    used[user_id].append(rand1)
+    s1 = questions[level][rand1][0]
+    type_q = questions[level][rand1][1]
+    levels[user_id].type_of_q = type_q
+    if type_q == "keys":
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        for i in range(len(questions[level][rand1][2:])):
+            tmp = questions[level][rand1][2:][i]
+            if tmp[0] == '!':
+                tmp = tmp[1:]
+            markup.add(types.KeyboardButton(tmp))
+    return s1, markup
+
 
 @bot.message_handler(commands=['start'])
 # Спрашиваем человека готов ли он к собеседованию
@@ -96,29 +149,7 @@ def get_text_messages(message):
             if levels[user_id].type_of_q == "keys":
                 levels[user_id].arr_of_ans.append(message.text)
         level = levels[user_id].level
-        if levels[user_id].num_of_ans >= config.cnt_questions:
-            levels[user_id].num_of_ans = 0
-            if levels[user_id].cnt_correct >= config.correct_ans:
-                if levels[user_id].level in [2, 4]:
-                    is_yes_to_start[user_id] = 0
-                    text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / (config.cnt_questions * 2) * 100) + "% вопросов\nНажмите /start для повторной попытки"
-                    bot.send_message(message.from_user.id,
-                                     text)
-                    levels.pop(user_id)
-                    used.pop(user_id)
-                else:
-                    bot.send_message(message.from_user.id,
-                                     "Я удивлен вашим познаниям. Давайте узнаем на что вы действительно способны")
-                if user_id in levels:
-                    levels[user_id].level += 1
-            else:
-                text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / config.cnt_questions * 100) \
-                       + "% вопросов первого теста\n Вам следует серьезнее подготовиться, иначе можно завалить КТ\nНажмите /start для повторной попытки"
-                bot.send_message(message.from_user.id, text)
-                is_yes_to_start[user_id] = 0
-            if user_id in levels and user_id in used:
-                levels[user_id].arr_of_ans = []
-                used[user_id] = []
+        get_result(message, user_id)
         if user_id in levels:
             level = levels[user_id].level
         if len(questions[level]) > 0 and is_yes_to_start[user_id] != 0:
@@ -131,8 +162,6 @@ def get_text_messages(message):
                 else:
                     levels[user_id].num_of_ans += 1
             if levels[user_id].level == 0:
-                if levels[user_id].q_id == 2 and message.text.lower() == "нет":
-                    rand1 = 3
                 levels[user_id].q_id = rand1 + 1
                 if (levels[user_id].q_id > len(questions[level])):
                     # if (message.text == '8'):
@@ -143,28 +172,8 @@ def get_text_messages(message):
                     used[user_id] = []
                     rand1 = randint(0, len(questions[level]) - 1)
 
-            prev_corr_ans = ""
-            if (len(levels[user_id].arr_of_ans) > 0):
-                tmp = "!" + levels[user_id].arr_of_ans[-1]
-                for ans in questions[level][used[user_id][-1]][2:]:
-                    if ans[0] == "!":
-                        prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + ans[1:]
-                    if tmp == ans:
-                        prev_corr_ans = ""
-                        levels[user_id].cnt_correct += 1
-                        break
-
-            used[user_id].append(rand1)
-            s1 = questions[level][rand1][0]
-            type_q = questions[level][rand1][1]
-            levels[user_id].type_of_q = type_q
-            if type_q == "keys":
-                markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-                for i in range(len(questions[level][rand1][2:])):
-                    tmp = questions[level][rand1][2:][i]
-                    if tmp[0] == '!':
-                        tmp = tmp[1:]
-                    markup.add(types.KeyboardButton(tmp))
+            prev_corr_ans = get_prev_correct_answer(user_id, level)
+            s1, markup = init_new_task(user_id, level, rand1, markup)
 
     print("Пользователь написал: ", '"', message.text, '"', sep='')
     if s1 != '.' and is_yes_to_start[user_id] != 0:
