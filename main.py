@@ -20,20 +20,20 @@ is_yes_to_start = dict()
 
 
 class UserInfo:
-    def __init__(self, num_of_ans, level, type_of_q, arr_of_ans, q_id, status):
+    def __init__(self, num_of_ans, level, type_of_q, arr_of_ans, q_id, cnt_correct):
         self.num_of_ans = num_of_ans
         self.level = level
         self.type_of_q = type_of_q
         self.arr_of_ans = arr_of_ans
         self.q_id = q_id
-        self.status = status
+        self.cnt_correct = cnt_correct
 
     num_of_ans = 0  # количество ответов
     level = 0  # уровень блока вопросов
     type_of_q = "type"  # тип вопроса
     arr_of_ans = []  # ответы пользователя
     q_id = 0  # номер текущего вопроса
-    status = "passed"
+    cnt_correct = 0 # количество верных ответов
 
 
 @bot.message_handler(commands=['start'])
@@ -42,7 +42,7 @@ def st(message):
     user_id = str(message.from_user.id)
     is_yes_to_start[user_id] = 0
     levels[user_id] = UserInfo(0, 0, 'type', [], 0,
-                               'passed')
+                               0)
     used[user_id] = []
 
     folder_name = user_id
@@ -89,7 +89,7 @@ def get_text_messages(message):
     if is_yes_to_start[user_id] == 1:
         if user_id not in levels:
             levels[user_id] = UserInfo(0, 0, 'type', [], 0,
-                                       'passed')  # количество ответов, уровень блока вопросов, тип вопроса, ответы
+                                       0)  # количество ответов, уровень блока вопросов, тип вопроса, количество верных ответов
         if user_id not in used:
             used[user_id] = []
         else:
@@ -98,19 +98,10 @@ def get_text_messages(message):
         level = levels[user_id].level
         if levels[user_id].num_of_ans >= config.cnt_questions:
             levels[user_id].num_of_ans = 0
-            cnt_correct = 0
-            for i in range(len(used[user_id])):
-                curr_block = questions[levels[user_id].level]  # узнаем блок
-                for corr_ans in curr_block[used[user_id][i]]:  # ответы нужного вопроса
-                    if corr_ans[0] == "!":
-                        corr_ans = corr_ans[1:]
-                        break
-                if corr_ans == levels[user_id].arr_of_ans[i]:
-                    cnt_correct += 1
-            if cnt_correct >= config.correct_ans:
+            if levels[user_id].cnt_correct >= config.correct_ans:
                 if levels[user_id].level in [2, 4]:
                     is_yes_to_start[user_id] = 0
-                    text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) + "% вопросов"
+                    text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / (config.cnt_questions * 2) * 100) + "% вопросов\nНажмите /start для повторной попытки"
                     bot.send_message(message.from_user.id,
                                      text)
                     levels.pop(user_id)
@@ -121,8 +112,8 @@ def get_text_messages(message):
                 if user_id in levels:
                     levels[user_id].level += 1
             else:
-                text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) \
-                       + "% вопросов\n Вам следует серьезнее подготовиться, иначе можно завалить КТ"
+                text = "Вы ответили правильно на " + str(levels[user_id].cnt_correct / config.cnt_questions * 100) \
+                       + "% вопросов первого теста\n Вам следует серьезнее подготовиться, иначе можно завалить КТ\nНажмите /start для повторной попытки"
                 bot.send_message(message.from_user.id, text)
                 is_yes_to_start[user_id] = 0
             if user_id in levels and user_id in used:
@@ -152,6 +143,17 @@ def get_text_messages(message):
                     used[user_id] = []
                     rand1 = randint(0, len(questions[level]) - 1)
 
+            prev_corr_ans = ""
+            if (len(levels[user_id].arr_of_ans) > 0):
+                tmp = "!" + levels[user_id].arr_of_ans[-1]
+                for ans in questions[level][used[user_id][-1]][2:]:
+                    if ans[0] == "!":
+                        prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + ans[1:]
+                    if tmp == ans:
+                        prev_corr_ans = ""
+                        levels[user_id].cnt_correct += 1
+                        break
+
             used[user_id].append(rand1)
             s1 = questions[level][rand1][0]
             type_q = questions[level][rand1][1]
@@ -166,6 +168,8 @@ def get_text_messages(message):
 
     print("Пользователь написал: ", '"', message.text, '"', sep='')
     if s1 != '.' and is_yes_to_start[user_id] != 0:
+        if (len(prev_corr_ans) > 0):
+            bot.send_message(message.from_user.id, prev_corr_ans, reply_markup=markup)
         msg = bot.send_message(message.from_user.id, s1, reply_markup=markup)
         print("Бот написал: ", '"', s1, '"', sep='')
     sys.stdout = open(filename, 'a')
