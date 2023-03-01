@@ -108,7 +108,7 @@ def get_text_messages(message):
                 if corr_ans == levels[user_id].arr_of_ans[i]:
                     cnt_correct += 1
             if cnt_correct >= config.correct_ans:
-                if levels[user_id].level in [1, 4]:
+                if levels[user_id].level in [2, 4]:
                     is_yes_to_start[user_id] = 0
                     text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) + "% вопросов"
                     bot.send_message(message.from_user.id,
@@ -121,7 +121,7 @@ def get_text_messages(message):
                 if user_id in levels:
                     levels[user_id].level += 1
             else:
-                text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions) \
+                text = "Вы ответили правильно на " + str(cnt_correct / config.cnt_questions * 100) \
                        + "% вопросов\n Вам следует серьезнее подготовиться, иначе можно завалить КТ"
                 bot.send_message(message.from_user.id, text)
                 is_yes_to_start[user_id] = 0
