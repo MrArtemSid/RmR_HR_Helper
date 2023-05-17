@@ -4,11 +4,13 @@ import requests
 import sys
 from os import mkdir, path, remove, stat
 from telebot import types
-from random import randint
+from random import randint, shuffle
 
 # Cвои библиотеки
 import config
-from questions import questions
+from questions import questions, all_ans, prepare
+
+prepare()
 
 used = {}
 levels = {}
@@ -38,6 +40,7 @@ class UserInfo:
     corr_ans_ind = -1 # индекс предыдущего правильного ответа
 
 def get_result(message, user_id):
+    config.cnt_questions = len(questions[levels[user_id].level])
     if levels[user_id].num_of_ans >= config.cnt_questions:
         levels[user_id].num_of_ans = 0
         if levels[user_id].cnt_correct >= config.correct_ans:
@@ -66,10 +69,10 @@ def get_result(message, user_id):
 
 def get_prev_correct_answer(user_id, level):
     prev_corr_ans = ""
-    if levels[user_id].prev_ans_ind != -1:
+    if levels[user_id].prev_ans_ind != -1 or True:
         ans_id = levels[user_id].prev_ans_ind
         correct_ans_id = levels[user_id].corr_ans_ind
-        if questions[level][used[user_id][-1]][2:][ans_id][0] != "!":
+        if ans_id != correct_ans_id:
             prev_corr_ans = "Вы неверно ответили на предыдущий вопрос. Правильный ответ - " + questions[level][used[user_id][-1]][2:][correct_ans_id][1:]
         else:
             levels[user_id].cnt_correct += 1
@@ -85,11 +88,23 @@ def init_new_task(user_id, level, rand1, markup):
     levels[user_id].type_of_q = type_q
     if type_q == "keys":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup_set = set()
         for i in range(len(questions[level][rand1][2:])):
             tmp = questions[level][rand1][2:][i]
-            if tmp[0] == '!':
-                tmp = tmp[1:]
-            markup.add(types.KeyboardButton(tmp))
+            markup_set.add(tmp)
+        while level != 0 and len(markup_set) < 4:
+            rand = randint(0, len(all_ans[level]) - 1)
+            if all_ans[level][rand] not in markup_set:
+                markup_set.add(all_ans[level][rand])
+        markup_set = list(markup_set)
+        shuffle(markup_set)
+        i = 0
+        for anss in markup_set:
+            if anss[0] == '!':
+                anss = anss[1:]
+                levels[user_id].corr_ans_ind = i
+            i += 1
+            markup.add(types.KeyboardButton(anss))
     return s1, markup
 
 
@@ -153,7 +168,8 @@ def get_text_messages(message):
             if levels[user_id].type_of_q == "keys":
                 level = levels[user_id].level
                 i = 0
-                is_fine = 0
+                is_fine = 1
+                levels[user_id].prev_ans_ind = -1
                 for ans in questions[level][used[user_id][-1]][2:]:
                     if ans in [message.text, "!" + message.text]:
                         levels[user_id].prev_ans_ind = i
@@ -161,6 +177,7 @@ def get_text_messages(message):
                     if ans[0] == "!":
                         levels[user_id].corr_ans_ind = i
                     i += 1
+
                 if not (is_fine):
                     s1, markup = init_new_task(user_id, level, -1, markup)
                     bot.send_message(message.from_user.id, s1, reply_markup=markup)
@@ -184,7 +201,10 @@ def get_text_messages(message):
                 levels[user_id].q_id = rand1 + 1
                 if (levels[user_id].q_id > len(questions[level])):
                     # if (message.text == '8'):
-                    level = 1
+                    if (message.text == questions[0][0][2]):
+                        level = 1
+                    else:
+                        level = 2
                     levels[user_id].level = level
                     levels[user_id].num_of_ans = 1
                     levels[user_id].prev_ans_ind = -1
